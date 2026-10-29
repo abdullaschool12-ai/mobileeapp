@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ECEDE8">
+<title>Enhanced Mobility</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>window.L || document.write('<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"><\/script>');</script>
+<style>
+  :root{
+    --pavement:#ECEDE8;   /* page */
+    --kerb:#D7D9D1;       /* borders, sunken fields */
+    --slab:#FAFAF7;       /* raised surfaces */
+    --ink:#1C2530;        /* text, main buttons */
+    --muted:#5B6470;
+    --tactile:#F6C324;    /* tactile paving yellow */
+    --tactile-deep:#D9A70C;
+    --go:#2F7A5A;
+    --stop:#C8432F;
+    --dome: radial-gradient(circle at 42% 38%, #FFE48A 0 1.6px, #F6C324 3px, #D9A70C 4.6px, transparent 5.2px);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;min-height:100vh;background:var(--pavement);color:var(--ink);
+    font-family:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size:17px;line-height:1.45;
+    padding:0 16px calc(96px + env(safe-area-inset-bottom));
+  }
+  .app{max-width:520px;margin:0 auto}
+
+  /* ---------- header ---------- */
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 0 14px}
+  .brand{display:flex;align-items:center;gap:12px}
+  .mark{width:40px;height:40px;border-radius:10px;background:var(--dome) 0 0/10px 10px,var(--tactile);box-shadow:inset 0 0 0 1px var(--tactile-deep)}
+  .brand h1{margin:0;font-size:20px;line-height:1.1}
+  .brand p{margin:2px 0 0;font-size:14px;color:var(--muted)}
+  .pill{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;background:var(--slab);border:1px solid var(--kerb);font-size:14px;white-space:nowrap;max-width:46%;overflow:hidden;text-overflow:ellipsis}
+  .pill i{width:10px;height:10px;border-radius:50%;background:#9AA1A9;flex:none}
+  .pill[data-kind=busy] i{background:var(--tactile-deep)}
+  .pill[data-kind=ok] i{background:var(--go)}
+  .pill[data-kind=err] i{background:var(--stop)}
+  #statusLine{margin:0 0 14px;font-size:15px;color:var(--muted);min-height:1.45em}
+
+  /* ---------- code word ---------- */
+  .code{background:var(--slab);border:1px solid var(--kerb);border-radius:16px;padding:12px 14px 14px}
+  label,.lbl{display:block;font-size:14px;color:var(--muted);margin:0 0 6px}
+  .codeRow{display:flex;gap:8px}
+  .codeRow input{flex:1;min-width:0}
+  input[type=text],input[type=password],input[type=number]{
+    width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--kerb);background:var(--pavement);
+    color:var(--ink);font:inherit;font-size:17px
+  }
+  input:focus{outline:none;border-color:var(--ink);background:#fff}
+  .ghost{padding:0 16px;border-radius:12px;border:1px solid var(--ink);background:transparent;color:var(--ink);font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+
+  /* ---------- panels ---------- */
+  .panel{margin-top:18px}
+  .panel[hidden]{display:none}
+  .intro{margin:0 0 14px;font-size:15px;color:var(--muted)}
+  .intro b{color:var(--ink)}
+
+  /* the guidance tile: tactile paving */
+  .tile{
+    position:relative;border-radius:20px;background:var(--tactile);color:var(--ink);
+    padding:34px 20px 20px;box-shadow:inset 0 0 0 1px var(--tactile-deep);overflow:hidden
+  }
+  .tile::before{content:"";position:absolute;left:0;right:0;top:0;height:22px;background:var(--dome) 6px 6px/14px 14px;opacity:.9}
+  .tile .say{margin:0;font-size:26px;line-height:1.25;font-weight:700;min-height:2.5em}
+  .tile .say.empty{font-weight:400;font-size:19px;color:#5a4a10}
+  .tile .meta{margin:10px 0 0;font-size:14px;color:#5a4a10}
+
+  .btn{
+    display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:none;border-radius:16px;
+    padding:20px;font:inherit;font-size:20px;font-weight:700;cursor:pointer;margin-top:12px;
+    transition:transform .08s ease, background-color .2s ease
+  }
+  .btn:active{transform:scale(.985)}
+  .btn.main{background:var(--ink);color:#fff}
+  .btn.main.running{background:var(--stop)}
+  .btn.go{background:var(--go);color:#fff}
+  .btn.soft{background:var(--slab);color:var(--ink);border:1px solid var(--kerb);font-size:18px;padding:16px}
+  .btn svg{width:24px;height:24px;flex:none}
+  .pair{display:flex;gap:10px}
+  .pair .btn{flex:1}
+
+  .check{display:flex;align-items:center;gap:12px;margin:14px 2px 0;font-size:16px;cursor:pointer}
+  .check input{width:22px;height:22px;accent-color:var(--ink);flex:none}
+
+  .map{height:260px;margin-top:16px;border-radius:18px;border:1px solid var(--kerb);background:var(--kerb);
+       color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;padding:0;overflow:hidden;font-size:15px}
+  .where{margin:10px 2px 0;font-size:15px;color:var(--muted)}
+  .where b{color:var(--ink)}
+  .where a{color:var(--ink);font-weight:700}
+
+  .voice{margin:12px 0 0;padding:12px 14px;border-radius:14px;background:var(--slab);border:1px dashed var(--muted);font-size:15px;color:var(--muted)}
+  .voice b{color:var(--ink)}
+  .voice[hidden]{display:none}
+  #heard{display:block;margin-top:6px;color:var(--ink)}
+  #heard:empty{display:none}
+  .alert{margin:0 0 14px;padding:16px;border-radius:16px;background:var(--stop);color:#fff;font-size:19px;font-weight:700}
+  .alert[hidden]{display:none}
+  /* ---------- easy mode: the whole screen is one button ---------- */
+  #easy{position:fixed;inset:0;z-index:3000;background:var(--tactile);color:var(--ink);display:flex;flex-direction:column}
+  #easy[hidden]{display:none}
+  #easy .strip{height:30px;flex:none;background:var(--dome) 4px 4px/18px 18px;opacity:.9}
+  #easyExit{position:absolute;top:calc(40px + env(safe-area-inset-top));right:16px;z-index:2;padding:10px 16px;border-radius:999px;
+    border:2px solid var(--ink);background:rgba(250,250,247,.85);color:var(--ink);font:inherit;font-size:14px;font-weight:700;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
+  #pad{flex:1;display:flex;flex-direction:column;justify-content:center;padding:24px;text-align:center;cursor:pointer;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  #pad.pressed{background:var(--tactile-deep)}
+  #easyBig{margin:0;font-size:34px;line-height:1.2;font-weight:700}
+  #easyGuide{margin:28px auto 0;max-width:22em;font-size:18px;line-height:1.5;color:#4a3d0c}
+  #easyGuide[hidden]{display:none}
+  .readings{display:flex;gap:10px;margin-top:14px}
+  .reading{flex:1;background:var(--slab);border:1px solid var(--kerb);border-radius:14px;padding:10px 14px}
+  .reading .lbl{margin:0;font-size:13px}
+  .reading .val{font-size:24px;font-weight:700;line-height:1.2}
+  #photo{display:none;width:100%;margin-top:14px;border-radius:16px;border:1px solid var(--kerb)}
+
+  details.settings{margin-top:16px;background:var(--slab);border:1px solid var(--kerb);border-radius:16px;padding:0 14px}
+  details.settings summary{cursor:pointer;padding:14px 0;font-weight:700;list-style:none;display:flex;justify-content:space-between}
+  details.settings summary::-webkit-details-marker{display:none}
+  details.settings summary::after{content:"Show";font-weight:400;color:var(--muted);font-size:15px}
+  details.settings[open] summary::after{content:"Hide"}
+  details.settings .field{margin-bottom:14px}
+  .note{font-size:14px;color:var(--muted);margin:14px 2px 0}
+  .note input[type=file]{display:block;margin-top:8px;font:inherit;font-size:14px;max-width:100%}
+
+  /* ---------- bottom tabs ---------- */
+  nav{
+    position:fixed;left:0;right:0;bottom:0;background:var(--slab);border-top:1px solid var(--kerb);
+    padding:8px 12px calc(8px + env(safe-area-inset-bottom));z-index:1000
+  }
+  nav .tabs{max-width:520px;margin:0 auto;display:flex;gap:6px}
+  nav button{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;border:none;background:transparent;
+    color:var(--muted);font:inherit;font-size:14px;padding:8px 4px;border-radius:12px;cursor:pointer
+  }
+  nav button svg{width:26px;height:26px}
+  nav button[aria-current=page]{background:var(--tactile);color:var(--ink);font-weight:700}
+
+  :focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+  .btn:focus-visible,nav button:focus-visible{outline-color:var(--tactile-deep)}
+  @media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+  .leaflet-container{font:inherit}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="brand">
+      <div class="mark" aria-hidden="true"></div>
+      <div>
+        <h1>Enhanced Mobility</h1>
+        <p>See ahead, hear the way</p>
+      </div>
+    </div>
+    <span class="pill" id="pill" data-kind="idle" aria-hidden="true"><i></i><span id="pillText">Ready</span></span>
+  </header>
+  <p id="statusLine" role="status" aria-live="polite">Pick a part below to begin.</p>
+
+  <div class="code">
+    <label for="topic">Code word. Use the same one on every device.</label>
+    <div class="codeRow">
+      <input id="topic" type="text" placeholder="em-k7p2xq9mfa" autocapitalize="off" autocomplete="off" spellcheck="false">
+      <button class="ghost" onclick="newCode()">New code</button>
+    </div>
+  </div>
+
+  <!-- ================= CAMERA ================= -->
+  <section class="panel" id="box_cam">
+    <p class="intro">Use on the <b>laptop</b>, opened from the saved file. It takes photos from the glasses, asks Gemini, and sends the advice to the walker's phone.</p>
+
+    <div class="tile">
+      <p class="say empty" id="camMsg">The advice from Gemini shows here.</p>
+    </div>
+
+    <div class="readings">
+      <div class="reading"><p class="lbl">Distance</p><div class="val" id="dist">--</div></div>
+      <div class="reading"><p class="lbl">Last photo</p><div class="val" id="lastShot">--</div></div>
+    </div>
+
+    <button class="btn main" id="camRun" onclick="toggleLoop()">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+      <span>Start guiding</span>
+    </button>
+    <button class="btn soft" onclick="captureOnce()">Take one photo</button>
+
+    <img id="photo" alt="Latest photo from the glasses camera">
+
+    <details class="settings" id="camSettings">
+      <summary>Camera settings</summary>
+      <div class="field">
+        <label for="espIp">Glasses camera address</label>
+        <input id="espIp" type="text" placeholder="http://192.168.1.231" autocapitalize="off" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="apiKey">Gemini key</label>
+        <input id="apiKey" type="password" placeholder="Paste your key here" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="interval">Take a photo every (seconds)</label>
+        <input id="interval" type="number" value="6" min="3">
+      </div>
+      <label class="check"><input id="speakHere" type="checkbox"> Also speak on this device</label>
+      <label class="check" style="margin-bottom:14px"><input id="sendPhone" type="checkbox" checked> Send advice to the walker's phone</label>
+    </details>
+
+    <p class="note">Camera not reachable from this device? Choose a saved photo instead.
+      <input type="file" id="fileInput" accept="image/*" onchange="handleFile(event)">
+    </p>
+  </section>
+
+  <!-- ================= WALKER ================= -->
+  <section class="panel" id="box_walk" hidden>
+    <p class="intro">Use on the <b>walker's phone</b>. It speaks the advice out loud and shares the location with family.</p>
+
+    <div class="tile">
+      <p class="say empty" id="walkMsg">Tap Start, and the advice from the glasses will be spoken here.</p>
+    </div>
+
+    <button class="btn main" id="walkRun" onclick="toggleWalker()">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+      <span>Start listening</span>
+    </button>
+    <button class="btn soft" onclick="openEasy()">Open easy mode for him</button>
+    <label class="check"><input id="liveShare" type="checkbox" checked> Share my location live, every 30 seconds</label>
+    <label class="check"><input id="voiceCmd" type="checkbox" checked> Listen for voice commands</label>
+    <div class="voice" id="voiceBox">
+      Say <b>"send location"</b>, <b>"where am I"</b>, <b>"repeat"</b> or <b>"help"</b>.
+      <span id="heard"></span>
+    </div>
+
+    <button class="btn go" onclick="sendLocation(false)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
+      <span>Send my location now</span>
+    </button>
+
+    <div class="map" id="walkMap">Your location shows here after you tap Start.</div>
+    <p class="where" id="walkLoc"></p>
+
+    <p class="note">Keep this page open with the screen on, and turn the volume up. On iPhone, turn off silent mode. Allow location when the phone asks.</p>
+  </section>
+
+  <!-- ================= FAMILY ================= -->
+  <section class="panel" id="box_fam" hidden>
+    <p class="intro">Use on the <b>family member's phone</b>. The map follows the walker and updates by itself.</p>
+
+    <div class="alert" id="famAlert" hidden></div>
+    <div class="map" id="famMap" style="height:320px;margin-top:0">Tap Start watching to see the walker.</div>
+    <p class="where" id="famInfo">No location received yet.</p>
+
+    <button class="btn main" id="famRun" onclick="toggleFamily()">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+      <span>Start watching</span>
+    </button>
+    <label class="check"><input id="famSpeak" type="checkbox" checked> Speak when he sends his location or asks for help</label>
+  </section>
+</div>
+
+<div id="easy" hidden>
+  <div class="strip" aria-hidden="true"></div>
+  <button id="easyExit" aria-label="Hold for two seconds to exit easy mode">Hold to exit</button>
+  <div id="pad" role="button" tabindex="0" aria-label="Tap anywhere to start. Then tap once to repeat, tap twice for where am I, hold for help.">
+    <p id="easyBig">Tap anywhere to start</p>
+    <p id="easyGuide" hidden>Tap once to hear the advice again.<br>Tap twice to hear where you are.<br>Hold to call for help.</p>
+  </div>
+  <div class="strip" aria-hidden="true"></div>
+</div>
+
+<nav aria-label="App parts">
+  <div class="tabs">
+    <button id="tab_cam" onclick="setMode('cam')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      Camera
+    </button>
+    <button id="tab_walk" onclick="setMode('walk')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16.5 9a4 4 0 0 1 0 6"/><path d="M19 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+      Walker
+    </button>
+    <button id="tab_fam" onclick="setMode('fam')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/></svg>
+      Family
+    </button>
+  </div>
+</nav>
+
+<script>
+/* ============ settings ============ */
+const MODEL = 'gemini-3.5-flash-lite';
+const NTFY  = 'https://ntfy.sh/';
+const $ = id => document.getElementById(id);
+const PLAY = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+const SQUARE = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+
+function load(k){ try { return localStorage.getItem('em_' + k); } catch(e){ return null; } }
+function save(k, v){ try { localStorage.setItem('em_' + k, v); } catch(e){} }
+
+const TEXT_IDS  = ['topic', 'espIp', 'apiKey', 'interval'];
+const CHECK_IDS = ['speakHere', 'sendPhone', 'liveShare', 'voiceCmd', 'famSpeak'];
+function loadSettings(){
+  TEXT_IDS.forEach(id => { const v = load(id); if (v !== null) $(id).value = v; });
+  CHECK_IDS.forEach(id => { const v = load(id); if (v !== null) $(id).checked = (v === '1'); });
+  if (!$('espIp').value) $('espIp').value = 'http://192.168.1.231';
+  if (!$('apiKey').value) $('camSettings').open = true;
+  TEXT_IDS.forEach(id => $(id).addEventListener('input', () => save(id, $(id).value)));
+  CHECK_IDS.forEach(id => $(id).addEventListener('change', () => save(id, $(id).checked ? '1' : '0')));
+  $('liveShare').addEventListener('change', updateLiveShare);
+  $('voiceCmd').addEventListener('change', () => {
+    $('voiceBox').hidden = !$('voiceCmd').checked;
+    if (walking && $('voiceCmd').checked) startVoice(); else stopVoice();
+  });
+  $('voiceBox').hidden = !$('voiceCmd').checked;
+}
+
+/* ============ helpers ============ */
+const PILL = { idle: 'Ready', busy: 'Working', ok: 'Live', err: 'Problem' };
+function setStatus(m, kind){
+  kind = kind || 'idle';
+  $('statusLine').innerText = m;
+  $('pill').dataset.kind = kind;
+  $('pillText').innerText = PILL[kind];
+}
+function now(){ return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+let speakingUntil = 0;   // the microphone ignores what it hears while the phone is talking
+function speak(text){
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    speakingUntil = Date.now() + 1500 + text.split(' ').length * 450;
+    u.onend = u.onerror = () => { speakingUntil = Date.now() + 700; };
+    window.speechSynthesis.speak(u);
+  } catch(e){ console.error(e); }
+}
+function showSay(id, text){ const el = $(id); el.innerText = text; el.classList.remove('empty'); }
+function setRun(id, running, startLabel, stopLabel){
+  const b = $(id);
+  b.classList.toggle('running', running);
+  b.innerHTML = (running ? SQUARE : PLAY) + '<span>' + (running ? stopLabel : startLabel) + '</span>';
+}
+function code(){ return $('topic').value.trim().replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 58); }
+function needCode(){
+  if (code()) return true;
+  setStatus('Type the code word first, or tap New code.', 'err');
+  speak('Type the code word first.');
+  $('topic').focus();
+  return false;
+}
+function newCode(){
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  const arr = new Uint32Array(10);
+  crypto.getRandomValues(arr);
+  let s = 'em-';
+  arr.forEach(n => s += chars[n % chars.length]);
+  $('topic').value = s; save('topic', s);
+  setStatus('New code made. Type the same code on the other devices.', 'ok');
+}
+async function publish(topic, body){
+  try { const r = await fetch(NTFY + topic, { method: 'POST', body }); return r.ok; }
+  catch(e){ return false; }
+}
+function parse(s){ try { return JSON.parse(s); } catch(e){ return null; } }
+const seenIds = new Set();
+function isNew(id){ if (!id || seenIds.has(id)) return false; seenIds.add(id); return true; }
+
+let wakeLock = null, keepAwake = 0;
+async function wakeOn(){ keepAwake++; try { if (navigator.wakeLock && !wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} }
+function wakeOff(){ keepAwake = Math.max(0, keepAwake - 1); if (keepAwake) return; try { if (wakeLock) wakeLock.release(); } catch(e){} wakeLock = null; }
+document.addEventListener('visibilitychange', () => { if (keepAwake && document.visibilityState === 'visible') { wakeLock = null; keepAwake--; wakeOn(); } });
+
+/* ============ maps ============ */
+const maps = {};
+function makeMap(id){
+  if (maps[id]) return maps[id];
+  if (typeof L === 'undefined') { $(id).innerText = 'The map could not load. Check the internet. The location is written below.'; return null; }
+  $(id).innerText = '';
+  const m = L.map(id, { attributionControl: true }).setView([24.45, 54.38], 11);
+  // street map from Esri: no key needed, works from a saved file and from Vercel
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: 'Tiles &copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors'
+  }).addTo(m);
+  maps[id] = { map: m, dot: null, ring: null };
+  return maps[id];
+}
+function showOnMap(id, lat, lng, acc){
+  const o = makeMap(id); if (!o) return;
+  const p = [lat, lng];
+  if (!o.dot) {
+    o.ring = L.circle(p, { radius: acc || 20, color: '#1C2530', weight: 1, fillColor: '#F6C324', fillOpacity: 0.25 }).addTo(o.map);
+    o.dot  = L.circleMarker(p, { radius: 10, color: '#1C2530', weight: 3, fillColor: '#F6C324', fillOpacity: 1 }).addTo(o.map);
+    o.map.setView(p, 17);
+  } else {
+    o.dot.setLatLng(p); o.ring.setLatLng(p).setRadius(acc || 20); o.map.panTo(p);
+  }
+}
+function refreshMaps(){ setTimeout(() => Object.values(maps).forEach(o => o.map.invalidateSize()), 60); }
+function mapsLink(lat, lng){ return 'https://www.google.com/maps?q=' + lat + ',' + lng; }
+
+/* ============ tabs ============ */
+function setMode(m){
+  save('mode', m);
+  ['cam', 'walk', 'fam'].forEach(k => {
+    $('box_' + k).hidden = (k !== m);
+    if (k === m) $('tab_' + k).setAttribute('aria-current', 'page');
+    else $('tab_' + k).removeAttribute('aria-current');
+  });
+  if (m === 'walk') makeMap('walkMap');
+  if (m === 'fam')  makeMap('famMap');
+  refreshMaps();
+  if (m === 'cam' && location.protocol === 'https:') {
+    setStatus('This page is online (https), so the browser may block the glasses camera. For Camera, open the saved file on the laptop.', 'err');
+  } else if (!loopHandle && !walking && !famES) {
+    setStatus('Ready when you are.', 'idle');
+  }
+}
+
+/* ============ CAMERA ============ */
+let loopHandle = null, busy = false;
+function baseIp(){
+  let v = $('espIp').value.trim().replace(/\/$/, '');
+  if (!/^https?:\/\//.test(v)) v = 'http://' + v;
+  return v;
+}
+function blobToBase64(blob){
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onloadend = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+}
+async function getDistance(){
+  try {
+    const ip = baseIp().replace(/^https?:\/\//, '').split(':')[0];
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), 4000);
+    const res = await fetch('http://' + ip + ':81/?_=' + Date.now(), { cache: 'no-store', signal: c.signal });
+    clearTimeout(t);
+    const n = parseFloat((await res.text()).trim());
+    if (!isNaN(n)) { $('dist').innerText = n.toFixed(0) + ' cm'; return n; }
+  } catch(e){
+    $('dist').innerText = 'No reading';
+  }
+  return null;
+}
+async function askGemini(b64, mime, dist){
+  const key = $('apiKey').value.trim();
+  if (!key) { setStatus('Paste your Gemini key in Camera settings first.', 'err'); $('camSettings').open = true; return null; }
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
+  const note = (dist !== null && dist > 0) ? ' A distance sensor measured the nearest obstacle at about ' + dist.toFixed(0) + ' centimeters.' : '';
+  const prompt = 'You are guiding a blind person walking through a space. Look at this photo and speak directly to them in ONE short, simple sentence. ' +
+    'Say what obstacle is ahead (door, stairs, person, vehicle, wall, furniture, etc.) and tell them to move LEFT, RIGHT, STOP, or that the path is CLEAR.' + note +
+    " Keep it under 18 words, plain and direct, like: 'Chair ahead, two meters, move slightly left.'";
+  const body = { contents: [{ parts: [ { inline_data: { mime_type: mime, data: b64 } }, { text: prompt } ] }] };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body) });
+      if (res.status === 503 && attempt === 0) { setStatus('Gemini is busy. Trying again...', 'busy'); await new Promise(r => setTimeout(r, 1500)); continue; }
+      if (!res.ok) { setStatus('Gemini error ' + res.status + '. Check the key, or wait if today\'s free limit is used up.', 'err'); return null; }
+      const data = await res.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
+    } catch(e){
+      setStatus('Could not reach Gemini. Check the internet.', 'err');
+      return null;
+    }
+  }
+  return null;
+}
+async function processBlob(blob){
+  const img = $('photo');
+  img.src = URL.createObjectURL(blob);
+  img.style.display = 'block';
+  $('lastShot').innerText = now();
+  setStatus('Checking the distance...', 'busy');
+  const dist = await getDistance();
+  setStatus('Asking Gemini what is ahead...', 'busy');
+  const answer = await askGemini(await blobToBase64(blob), blob.type || 'image/jpeg', dist);
+  if (!answer) return;
+  showSay('camMsg', answer);
+  if ($('speakHere').checked) speak(answer);
+  if ($('sendPhone').checked && code()) {
+    const ok = await publish(code(), answer);
+    setStatus(ok ? 'Advice sent to the walker\'s phone at ' + now() + '.' : 'Advice ready, but not sent. Check the code word and the internet.', ok ? 'ok' : 'err');
+  } else {
+    setStatus('Advice ready at ' + now() + '.', 'ok');
+  }
+}
+async function captureOnce(){
+  if (busy) return;
+  busy = true;
+  setStatus('Taking a photo from the glasses...', 'busy');
+  try {
+    const res = await fetch(baseIp() + '/capture?_=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('Bad response ' + res.status);
+    await processBlob(await res.blob());
+  } catch(e){
+    setStatus('Could not reach the glasses camera. Check the Wi-Fi, the number address, and that the camera is on.', 'err');
+  } finally { busy = false; }
+}
+function handleFile(ev){ const f = ev.target.files[0]; if (f) processBlob(f); }
+function toggleLoop(){
+  if (loopHandle) {
+    clearInterval(loopHandle); loopHandle = null;
+    setRun('camRun', false, 'Start guiding', 'Stop guiding');
+    setStatus('Guiding stopped.', 'idle');
+    return;
+  }
+  if ($('speakHere').checked) speak('Starting.');
+  const s = Math.max(3, parseFloat($('interval').value) || 6);
+  setRun('camRun', true, 'Start guiding', 'Stop guiding');
+  captureOnce();
+  loopHandle = setInterval(captureOnce, s * 1000);
+}
+
+/* ============ WALKER ============ */
+let walkES = null, geoWatch = null, lastPos = null, liveTimer = null, walking = false, lastAdvice = '';
+
+function savePos(p){
+  lastPos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy), t: Date.now() };
+  $('walkLoc').innerHTML = 'You are here: <b>' + lastPos.lat.toFixed(5) + ', ' + lastPos.lng.toFixed(5) + '</b>, within about ' + lastPos.acc + ' m';
+  showOnMap('walkMap', lastPos.lat, lastPos.lng, lastPos.acc);
+  return lastPos;
+}
+function gpsError(err){ $('walkLoc').innerText = 'Location is off or blocked (' + err.message + '). Allow location for this site in the phone settings.'; }
+function startGps(){
+  if (!navigator.geolocation) { $('walkLoc').innerText = 'This device cannot share its location.'; return; }
+  if (geoWatch !== null) return;
+  geoWatch = navigator.geolocation.watchPosition(savePos, gpsError, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+}
+function getPosOnce(){
+  return new Promise(res => {
+    if (!navigator.geolocation) return res(null);
+    navigator.geolocation.getCurrentPosition(p => res(savePos(p)), e => { gpsError(e); res(null); },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
+  });
+}
+async function freshPos(){ return (lastPos && Date.now() - lastPos.t < 45000) ? lastPos : await getPosOnce(); }
+
+/* kind: 'live' (automatic, quiet), 'manual' (he asked), 'help' (emergency) */
+async function sendLocation(silent, kind){
+  kind = kind || 'manual';
+  if (!needCode()) return false;
+  if (!silent) setStatus('Finding your location...', 'busy');
+  const pos = await freshPos();
+  if (!pos) {
+    if (!silent) speak('I cannot find your location.');
+    setStatus('Could not find the location. Allow location for this site.', 'err');
+    return false;
+  }
+  const ok = await publish(code() + '-loc', JSON.stringify({ lat: pos.lat, lng: pos.lng, acc: pos.acc, kind }));
+  const what = kind === 'help' ? 'Help alert' : (kind === 'live' ? 'Live location' : 'Location');
+  setStatus(ok ? what + ' sent to family at ' + now() + '.' : what + ' not sent. Check the internet.', ok ? 'ok' : 'err');
+  if (!silent) {
+    if (kind === 'help') speak(ok ? 'Help message sent to your family.' : 'The help message was not sent. Check the internet.');
+    else speak(ok ? 'Location sent to your family.' : 'The location was not sent.');
+  }
+  return ok;
+}
+function updateLiveShare(){
+  clearInterval(liveTimer); liveTimer = null;
+  if (walking && $('liveShare').checked) {
+    sendLocation(true, 'live');
+    liveTimer = setInterval(() => sendLocation(true, 'live'), 30000);
+  }
+}
+
+/* "where am I": turn the location into a street name */
+async function placeName(lat, lng){
+  try {
+    const r = await fetch('https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=json&langCode=en&location=' + lng + ',' + lat);
+    const a = (await r.json()).address;
+    if (a) {
+      const street = a.Address || a.ShortLabel || '';
+      const area = a.Neighborhood || a.District || a.City || '';
+      const name = [street, area].filter(Boolean).join(', ');
+      if (name) return name;
+    }
+  } catch(e){}
+  try {
+    const r = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&accept-language=en&lat=' + lat + '&lon=' + lng);
+    const d = await r.json();
+    if (d && d.display_name) return d.display_name.split(',').slice(0, 3).join(',');
+  } catch(e){}
+  return null;
+}
+async function sayWhere(){
+  setStatus('Finding where you are...', 'busy');
+  const pos = await freshPos();
+  if (!pos) { speak('I cannot find your location.'); return; }
+  const name = await placeName(pos.lat, pos.lng);
+  const line = name ? 'You are near ' + name + '.' : 'I found your location, but I cannot read the street name.';
+  speak(line);
+  setStatus(line, name ? 'ok' : 'err');
+}
+
+/* ---- voice commands ---- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, voiceWanted = false;
+function heard(t){ $('heard').innerText = t ? 'Heard: "' + t + '"' : ''; }
+function handleCommand(t){
+  if (/\bhelp\b|emergency/.test(t))            { heard(t); sendLocation(false, 'help'); }
+  else if (/where am i|where i am/.test(t))     { heard(t); sayWhere(); }
+  else if (/location|send/.test(t))             { heard(t); sendLocation(false, 'manual'); }
+  else if (/repeat|again/.test(t))              { heard(t); speak(lastAdvice || 'No advice yet.'); }
+  else if (/command|what can i say/.test(t))    { heard(t); speak('You can say: send location, where am I, repeat, or help. ' + (easy ? EASY_HELP : '')); }
+}
+function startVoice(){
+  if (!SR) { $('heard').innerText = 'Voice commands do not work in this browser. Use Chrome on Android or Safari on iPhone.'; return; }
+  voiceWanted = true;
+  if (rec) return;
+  rec = new SR();
+  rec.lang = 'en-US';
+  rec.continuous = true;
+  rec.interimResults = false;
+  rec.maxAlternatives = 3;
+  rec.onresult = ev => {
+    if (Date.now() < speakingUntil) return;        // ignore the phone's own voice
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      if (!ev.results[i].isFinal) continue;
+      const alts = Array.from(ev.results[i]).map(a => a.transcript.toLowerCase().trim());
+      handleCommand(alts.join(' | '));
+    }
+  };
+  rec.onerror = e => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      voiceWanted = false;
+      $('heard').innerText = 'The microphone is blocked. Allow the microphone for this site, then tap Start again.';
+    }
+  };
+  rec.onend = () => { rec = null; if (voiceWanted && walking) setTimeout(startVoice, 500); };
+  try { rec.start(); } catch(e){ rec = null; }
+}
+function stopVoice(){
+  voiceWanted = false;
+  if (rec) { try { rec.stop(); } catch(e){} }
+  rec = null;
+}
+
+function toggleWalker(){
+  if (walking) {
+    walking = false;
+    if (walkES) walkES.close(); walkES = null;
+    if (geoWatch !== null) { navigator.geolocation.clearWatch(geoWatch); geoWatch = null; }
+    clearInterval(liveTimer); liveTimer = null;
+    stopVoice(); heard('');
+    wakeOff();
+    setRun('walkRun', false, 'Start listening', 'Stop listening');
+    setStatus('Listening stopped.', 'idle');
+    speak('Stopped.');
+    return;
+  }
+  if (!needCode()) return;
+  speak(easy ? 'Ready. ' + EASY_HELP : 'Ready. I will speak the advice.');   // this tap also unlocks sound
+  walking = true;
+  walkES = new EventSource(NTFY + code() + '/sse');
+  walkES.onopen = () => setStatus('Listening for advice from the glasses.', 'ok');
+  walkES.onerror = () => setStatus('Connection lost. Reconnecting by itself...', 'err');
+  walkES.onmessage = ev => {
+    const d = parse(ev.data);
+    if (d && d.event === 'message' && d.message && isNew(d.id)) {
+      lastAdvice = d.message;
+      showSay('walkMsg', d.message);
+      if (easy) $('easyBig').innerText = d.message;
+      buzz(80);
+      speak(d.message);
+    }
+  };
+  startGps();
+  updateLiveShare();
+  if ($('voiceCmd').checked) startVoice();
+  wakeOn();
+  setRun('walkRun', true, 'Start listening', 'Stop listening');
+  if (easy) showEasyRunning();
+}
+
+/* ============ EASY MODE (no looking needed) ============ */
+let easy = false;
+const EASY_HELP = 'Tap once to hear the advice again. Tap twice to hear where you are. Hold to call for help.';
+function buzz(p){ try { if (navigator.vibrate) navigator.vibrate(p); } catch(e){} }
+function showEasyRunning(){
+  $('easyBig').innerText = lastAdvice || 'Listening for advice';
+  $('easyGuide').hidden = false;
+}
+function openEasy(){
+  if (!needCode()) return;
+  easy = true; save('easy', '1');
+  $('easy').hidden = false;
+  document.body.style.overflow = 'hidden';
+  if (walking) showEasyRunning();
+  else { $('easyBig').innerText = 'Tap anywhere to start'; $('easyGuide').hidden = true; }
+}
+function closeEasy(){
+  easy = false; save('easy', '0');
+  $('easy').hidden = true;
+  document.body.style.overflow = '';
+}
+async function whereAndShare(){
+  const pos = await freshPos();
+  if (!pos) { speak('I cannot find your location.'); return; }
+  const [name, ok] = await Promise.all([
+    placeName(pos.lat, pos.lng),
+    publish(code() + '-loc', JSON.stringify({ lat: pos.lat, lng: pos.lng, acc: pos.acc, kind: 'manual' }))
+  ]);
+  speak((name ? 'You are near ' + name + '. ' : 'I cannot read the street name. ') +
+        (ok ? 'Your family has your location.' : 'The location was not sent.'));
+  setStatus(ok ? 'Location sent to family at ' + now() + '.' : 'Location not sent.', ok ? 'ok' : 'err');
+}
+function setupEasyPad(){
+  const pad = $('pad');
+  let taps = 0, tapTimer = null, holdWarn = null, holdHelp = null, holding = 0; // 0 none, 1 warned, 2 sent
+  const clearHold = () => { clearTimeout(holdWarn); clearTimeout(holdHelp); pad.classList.remove('pressed'); };
+
+  pad.addEventListener('contextmenu', e => e.preventDefault());
+  // first tap starts everything ("click" so phones allow sound)
+  pad.addEventListener('click', () => { if (!walking) toggleWalker(); });
+
+  pad.addEventListener('pointerdown', () => {
+    if (!walking) return;
+    holding = 0;
+    pad.classList.add('pressed');
+    holdWarn = setTimeout(() => { holding = 1; buzz(60); speak('Keep holding for help.'); }, 800);
+    holdHelp = setTimeout(() => { holding = 2; buzz([300, 100, 300]); sendLocation(false, 'help'); }, 2500);
+  });
+  pad.addEventListener('pointercancel', () => { clearHold(); holding = 0; });
+  pad.addEventListener('pointerup', () => {
+    if (!walking) return;
+    clearHold();
+    if (holding === 1) { speak('Cancelled.'); holding = 0; return; }
+    if (holding === 2) { holding = 0; return; }
+    taps++;
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(() => {
+      const n = taps; taps = 0;
+      if (n === 1) { buzz(40); speak(lastAdvice || 'No advice yet. I am listening.'); }
+      else { buzz([40, 80, 40]); whereAndShare(); }
+    }, 450);
+  });
+
+  // family member exits by holding the small button for 2 seconds
+  const exit = $('easyExit');
+  let exitT = null;
+  exit.addEventListener('contextmenu', e => e.preventDefault());
+  exit.addEventListener('pointerdown', e => { e.stopPropagation(); exitT = setTimeout(closeEasy, 2000); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => exit.addEventListener(ev, e => { e.stopPropagation(); clearTimeout(exitT); }));
+  exit.addEventListener('click', e => e.stopPropagation());
+}
+
+/* ============ FAMILY ============ */
+let famES = null, famStartedAt = 0;
+function toggleFamily(){
+  if (famES) {
+    famES.close(); famES = null;
+    wakeOff();
+    setRun('famRun', false, 'Start watching', 'Stop watching');
+    setStatus('Watching stopped.', 'idle');
+    return;
+  }
+  if (!needCode()) return;
+  speak('Watching for the location.');   // unlocks sound
+  famStartedAt = Date.now();
+  famES = new EventSource(NTFY + code() + '-loc/sse?since=latest');
+  famES.onopen = () => setStatus('Watching. The map follows the walker.', 'ok');
+  famES.onerror = () => setStatus('Connection lost. Reconnecting by itself...', 'err');
+  famES.onmessage = ev => {
+    const d = parse(ev.data);
+    if (!d || d.event !== 'message') return;
+    const loc = parse(d.message);
+    if (!loc || typeof loc.lat !== 'number') return;
+    const fresh = isNew(d.id);
+    const sentAt = (d.time || Date.now() / 1000) * 1000;
+    const isRecent = sentAt > famStartedAt - 5000;
+    showOnMap('famMap', loc.lat, loc.lng, loc.acc);
+    const when = new Date(sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const how = loc.kind === 'live' ? 'Live location' : (loc.kind === 'help' ? 'Help alert' : 'Location sent by him');
+    $('famInfo').innerHTML = how + ' at <b>' + when + '</b>, within about ' + (loc.acc || '?') + ' m. ' +
+      '<a href="' + mapsLink(loc.lat, loc.lng) + '" target="_blank" rel="noopener">Open in Google Maps</a>';
+    if (loc.kind === 'help' && Date.now() - sentAt < 30 * 60000) {
+      $('famAlert').hidden = false;
+      $('famAlert').innerHTML = 'He asked for help at ' + when + '. <a style="color:#fff" href="' + mapsLink(loc.lat, loc.lng) + '" target="_blank" rel="noopener">Open in Google Maps</a>';
+    }
+    if (!fresh || !isRecent || !$('famSpeak').checked) return;
+    if (loc.kind === 'help') speak('Help! He needs help. Check the map.');
+    else if (loc.kind !== 'live') speak('New location received.');
+  };
+  wakeOn();
+  setRun('famRun', true, 'Start watching', 'Stop watching');
+}
+
+/* ============ start ============ */
+loadSettings();
+setupEasyPad();
+if (load('easy') === '1' && code()) { setMode('walk'); openEasy(); }
+else setMode(load('mode') || 'cam');
+</script>
+</body>
+</html>
